@@ -34,7 +34,6 @@
     .dl-sub { font-size: 12px; color: #666; margin-top: 2px; }
     audio { width: 100%; margin-bottom: 14px; border-radius: 10px; }
 
-    /* Modal Pilihan Format */
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 100; }
     .modal { background: #fff; width: 100%; max-width: 440px; border-radius: 22px; padding: 22px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
     .modal-close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #e0e0e0; background: #f8f8f8; font-size: 18px; cursor: pointer; }
@@ -158,7 +157,8 @@
         document.getElementById('songTitle').textContent = data.title;
         document.getElementById('songCover').src = data.image;
         document.getElementById('songLink').href = data.sunoUrl;
-        document.getElementById('audioPlayer').src = `/api/suno?proxy=${encodeURIComponent(data.audioUrl)}`;
+        // Putar langsung dari URL Suno (menggunakan jaringan HP/PC Anda)
+        document.getElementById('audioPlayer').src = data.audioUrl;
 
         resultCard.style.display = 'block';
       } catch (err) {
@@ -187,29 +187,48 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     }
 
+    // Ambil audio langsung dari Suno (HP/PC Anda), jika diblokir CORS baru coba proxy
+    async function fetchAudioBuffer(song) {
+      const sources = [
+        song.audioUrl,
+        `https://cdn1.suno.ai/${song.id}.mp3`,
+        `https://cdn2.suno.ai/${song.id}.mp3`,
+        `/api/suno?proxy=${encodeURIComponent(song.audioUrl)}&id=${encodeURIComponent(song.id)}`
+      ];
+
+      for (const src of [...new Set(sources)]) {
+        try {
+          const res = await fetch(src);
+          const ct = res.headers.get('content-type') || '';
+          if (res.ok && !ct.includes('json') && !ct.includes('html')) {
+            return await res.arrayBuffer();
+          }
+        } catch (_) {
+          // Lanjut ke sumber berikutnya
+        }
+      }
+      throw new Error('Tidak dapat mengambil file audio.');
+    }
+
     async function downloadFormat(type) {
       if (!currentSong) return;
       const btns = document.querySelectorAll('.format-btn');
       btns.forEach(b => b.disabled = true);
 
       const safeTitle = currentSong.title.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'suno-song';
-      const proxyUrl = `/api/suno?proxy=${encodeURIComponent(currentSong.audioUrl)}`;
 
       try {
+        statusText.textContent = 'Mengambil audio...';
+        const arrayBuffer = await fetchAudioBuffer(currentSong);
+
         if (type === 'original') {
-          statusText.textContent = 'Mengunduh audio asli...';
-          const res = await fetch(proxyUrl);
-          const blob = await res.blob();
+          const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
           triggerDownload(blob, `${safeTitle}.mp3`);
           statusText.textContent = 'Selesai!';
         } else {
-          statusText.textContent = 'Mengambil audio...';
-          const res = await fetch(proxyUrl);
-          const arrayBuffer = await res.arrayBuffer();
-
           statusText.textContent = `Mengonversi ke ${type.toUpperCase()}... (tunggu sebentar)`;
           const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
 
           if (type === 'wav') {
             const wavBlob = encodeWAV(audioBuffer);
@@ -221,7 +240,13 @@
           statusText.textContent = 'Download dimulai!';
         }
       } catch (err) {
-        statusText.textContent = 'Gagal memproses audio. Coba pilih Audio asli.';
+        if (type === 'original') {
+          // Cadangan terakhir: buka link audio langsung di tab baru agar browser HP bisa langsung simpan
+          statusText.textContent = 'Membuka file audio langsung...';
+          window.open(currentSong.audioUrl, '_blank');
+        } else {
+          statusText.textContent = 'Gagal memproses audio. Coba pilih Audio asli.';
+        }
       } finally {
         btns.forEach(b => b.disabled = false);
       }

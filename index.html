@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Download Lagu Suno Gratis</title>
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #f4f5f4; color: #1a1a1a; min-height: 100vh; padding: 24px 16px; }
+    .container { max-width: 540px; margin: 0 auto; }
+    .badge { display: inline-block; background: #e8eae8; color: #444; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 999px; letter-spacing: 0.5px; margin-bottom: 14px; }
+    header { text-align: center; margin-bottom: 24px; }
+    h1 { font-size: 28px; font-weight: 800; line-height: 1.2; margin-bottom: 10px; }
+    .subtitle { color: #555; font-size: 15px; line-height: 1.5; }
+    .card { background: #fff; border-radius: 20px; padding: 18px; box-shadow: 0 6px 24px rgba(0,0,0,0.06); margin-bottom: 18px; }
+    textarea { width: 100%; border: none; outline: none; resize: none; font-size: 15px; color: #222; min-height: 54px; margin-bottom: 14px; }
+    .actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .btn { border: none; border-radius: 999px; padding: 12px 20px; font-size: 15px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; }
+    .btn-light { background: #f2f3f2; color: #222; border: 1px solid #e2e4e2; }
+    .btn-light:hover { background: #e7e9e7; }
+    .btn-primary { background: #3b7d23; color: #fff; }
+    .btn-primary:hover { background: #2f651b; }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error-msg { color: #c62828; background: #ffebee; padding: 12px 14px; border-radius: 12px; font-size: 14px; margin-bottom: 16px; display: none; }
+    .result-card { display: none; }
+    .song-row { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+    .cover { width: 76px; height: 76px; border-radius: 12px; object-fit: cover; background: #ddd; flex-shrink: 0; }
+    .song-title { font-size: 18px; font-weight: 800; line-height: 1.3; margin-bottom: 6px; }
+    .suno-link { font-size: 13px; color: #3b7d23; text-decoration: none; font-weight: 600; }
+    .download-trigger { width: 100%; display: flex; justify-content: space-between; align-items: center; background: #f5f6f5; border: 1px solid #e5e7e5; border-radius: 14px; padding: 14px 16px; cursor: pointer; text-align: left; }
+    .download-trigger:hover { background: #eceeec; }
+    .dl-label { font-weight: 700; font-size: 15px; }
+    .dl-sub { font-size: 12px; color: #666; margin-top: 2px; }
+    audio { width: 100%; margin-bottom: 14px; border-radius: 10px; }
+
+    /* Modal Pilihan Format */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 100; }
+    .modal { background: #fff; width: 100%; max-width: 440px; border-radius: 22px; padding: 22px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+    .modal-close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #e0e0e0; background: #f8f8f8; font-size: 18px; cursor: pointer; }
+    .modal-kicker { font-size: 11px; font-weight: 800; color: #8c6200; letter-spacing: 0.8px; margin-bottom: 4px; }
+    .modal h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .modal-desc { font-size: 13px; color: #555; margin-bottom: 16px; line-height: 1.4; }
+    .format-btn { width: 100%; text-align: left; background: #fafafa; border: 1px solid #e2e4e2; border-radius: 14px; padding: 14px; margin-bottom: 10px; cursor: pointer; display: flex; gap: 14px; align-items: center; transition: 0.15s; }
+    .format-btn:hover { background: #f0f5ee; border-color: #3b7d23; }
+    .format-btn:disabled { opacity: 0.5; cursor: wait; }
+    .format-name { font-weight: 800; font-size: 15px; min-width: 82px; }
+    .format-info { font-size: 12.5px; color: #555; line-height: 1.4; }
+    .status-text { font-size: 13px; color: #3b7d23; font-weight: 600; text-align: center; margin-top: 8px; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">↓ ALAT DOWNLOAD</div>
+      <h1>Download Lagu Suno ke MP3 Gratis</h1>
+      <p class="subtitle">Tempel link lagu Suno untuk mendownload MP3, WAV, atau audio asli langsung dari browser.</p>
+    </header>
+
+    <div class="card">
+      <textarea id="urlInput" placeholder="Tempel tautan suno.com/song/... atau suno.com/s/..."></textarea>
+      <div class="actions">
+        <button class="btn btn-light" id="pasteBtn">📋 Tempel</button>
+        <button class="btn btn-primary" id="fetchBtn">→ Download</button>
+      </div>
+    </div>
+
+    <div id="errorBox" class="error-msg"></div>
+
+    <div id="resultCard" class="card result-card">
+      <div class="song-row">
+        <img id="songCover" class="cover" src="" alt="Cover Lagu" />
+        <div>
+          <div id="songTitle" class="song-title">Judul Lagu</div>
+          <a id="songLink" class="suno-link" href="#" target="_blank">Buka di Suno ↗</a>
+        </div>
+      </div>
+      <audio id="audioPlayer" controls></audio>
+      <button class="download-trigger" id="openModalBtn">
+        <div>
+          <div class="dl-label">🎵 Audio</div>
+          <div class="dl-sub">PILIH FORMAT</div>
+        </div>
+        <span style="font-size:20px;">↓</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Pop-up Pilih Format -->
+  <div id="formatModal" class="modal-backdrop">
+    <div class="modal">
+      <button class="modal-close" id="closeModalBtn">×</button>
+      <div class="modal-kicker">SIMPAN AUDIO</div>
+      <h2>Pilih format audio</h2>
+      <p class="modal-desc">MP3 dan WAV diproses langsung di perangkat Anda. Audio asli diunduh tanpa konversi.</p>
+
+      <button class="format-btn" onclick="downloadFormat('mp3')">
+        <div class="format-name">MP3</div>
+        <div class="format-info">Paling kompatibel untuk semua pemutar musik di HP dan PC.</div>
+      </button>
+
+      <button class="format-btn" onclick="downloadFormat('wav')">
+        <div class="format-name">WAV</div>
+        <div class="format-info">Tanpa kompresi untuk editing. Ukuran file lebih besar.</div>
+      </button>
+
+      <button class="format-btn" onclick="downloadFormat('original')">
+        <div class="format-name">Audio asli</div>
+        <div class="format-info">Paling cepat. Mempertahankan format asli langsung dari Suno.</div>
+      </button>
+
+      <div id="statusText" class="status-text"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentSong = null;
+
+    const urlInput = document.getElementById('urlInput');
+    const pasteBtn = document.getElementById('pasteBtn');
+    const fetchBtn = document.getElementById('fetchBtn');
+    const errorBox = document.getElementById('errorBox');
+    const resultCard = document.getElementById('resultCard');
+    const formatModal = document.getElementById('formatModal');
+    const statusText = document.getElementById('statusText');
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.style.display = 'block';
+    }
+    function hideError() {
+      errorBox.style.display = 'none';
+    }
+
+    pasteBtn.addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        urlInput.value = text;
+      } catch {
+        showError('Izin clipboard ditolak. Silakan tempel link secara manual.');
+      }
+    });
+
+    fetchBtn.addEventListener('click', async () => {
+      const link = urlInput.value.trim();
+      hideError();
+      if (!link) return showError('Tempel tautan lagu Suno terlebih dahulu.');
+
+      fetchBtn.disabled = true;
+      fetchBtn.textContent = 'Memproses...';
+
+      try {
+        const res = await fetch(`/api/suno?url=${encodeURIComponent(link)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Gagal mengambil data lagu.');
+
+        currentSong = data;
+        document.getElementById('songTitle').textContent = data.title;
+        document.getElementById('songCover').src = data.image;
+        document.getElementById('songLink').href = data.sunoUrl;
+        document.getElementById('audioPlayer').src = `/api/suno?proxy=${encodeURIComponent(data.audioUrl)}`;
+
+        resultCard.style.display = 'block';
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = '→ Download';
+      }
+    });
+
+    document.getElementById('openModalBtn').onclick = () => {
+      statusText.textContent = '';
+      formatModal.style.display = 'flex';
+    };
+    document.getElementById('closeModalBtn').onclick = () => {
+      formatModal.style.display = 'none';
+    };
+
+    function triggerDownload(blob, filename) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+
+    async function downloadFormat(type) {
+      if (!currentSong) return;
+      const btns = document.querySelectorAll('.format-btn');
+      btns.forEach(b => b.disabled = true);
+
+      const safeTitle = currentSong.title.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'suno-song';
+      const proxyUrl = `/api/suno?proxy=${encodeURIComponent(currentSong.audioUrl)}`;
+
+      try {
+        if (type === 'original') {
+          statusText.textContent = 'Mengunduh audio asli...';
+          const res = await fetch(proxyUrl);
+          const blob = await res.blob();
+          triggerDownload(blob, `${safeTitle}.mp3`);
+          statusText.textContent = 'Selesai!';
+        } else {
+          statusText.textContent = 'Mengambil audio...';
+          const res = await fetch(proxyUrl);
+          const arrayBuffer = await res.arrayBuffer();
+
+          statusText.textContent = `Mengonversi ke ${type.toUpperCase()}... (tunggu sebentar)`;
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+          if (type === 'wav') {
+            const wavBlob = encodeWAV(audioBuffer);
+            triggerDownload(wavBlob, `${safeTitle}.wav`);
+          } else if (type === 'mp3') {
+            const mp3Blob = encodeMP3(audioBuffer);
+            triggerDownload(mp3Blob, `${safeTitle}.mp3`);
+          }
+          statusText.textContent = 'Download dimulai!';
+        }
+      } catch (err) {
+        statusText.textContent = 'Gagal memproses audio. Coba pilih Audio asli.';
+      } finally {
+        btns.forEach(b => b.disabled = false);
+      }
+    }
+
+    function encodeWAV(audioBuffer) {
+      const numChannels = audioBuffer.numberOfChannels;
+      const sampleRate = audioBuffer.sampleRate;
+      const length = audioBuffer.length * numChannels * 2;
+      const buffer = new ArrayBuffer(44 + length);
+      const view = new DataView(buffer);
+
+      const writeStr = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+
+      writeStr(0, 'RIFF');
+      view.setUint32(4, 36 + length, true);
+      writeStr(8, 'WAVE');
+      writeStr(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * numChannels * 2, true);
+      view.setUint16(32, numChannels * 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, 'data');
+      view.setUint32(40, length, true);
+
+      let offset = 44;
+      const channels = [];
+      for (let c = 0; c < numChannels; c++) channels.push(audioBuffer.getChannelData(c));
+
+      for (let i = 0; i < audioBuffer.length; i++) {
+        for (let c = 0; c < numChannels; c++) {
+          let sample = Math.max(-1, Math.min(1, channels[c][i]));
+          view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+          offset += 2;
+        }
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function encodeMP3(audioBuffer) {
+      const channels = audioBuffer.numberOfChannels;
+      const sampleRate = audioBuffer.sampleRate;
+      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 192);
+      const mp3Data = [];
+
+      const floatTo16Bit = (arr) => {
+        const out = new Int16Array(arr.length);
+        for (let i = 0; i < arr.length; i++) {
+          const s = Math.max(-1, Math.min(1, arr[i]));
+          out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        return out;
+      };
+
+      const left = floatTo16Bit(audioBuffer.getChannelData(0));
+      const right = channels > 1 ? floatTo16Bit(audioBuffer.getChannelData(1)) : left;
+      const blockSize = 1152;
+
+      for (let i = 0; i < left.length; i += blockSize) {
+        const leftChunk = left.subarray(i, i + blockSize);
+        const rightChunk = right.subarray(i, i + blockSize);
+        const buf = channels > 1 ? mp3encoder.encodeBuffer(leftChunk, rightChunk) : mp3encoder.encodeBuffer(leftChunk);
+        if (buf.length > 0) mp3Data.push(buf);
+      }
+      const end = mp3encoder.flush();
+      if (end.length > 0) mp3Data.push(end);
+      return new Blob(mp3Data, { type: 'audio/mp3' });
+    }
+  </script>
+</body>
+</html>

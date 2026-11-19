@@ -3,23 +3,58 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { url, proxy, filename } = req.query;
+  const { url, proxy, id, filename } = req.query;
 
-  // MODE 1: Proxy file audio agar bisa didownload & dikonversi di browser
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Referer': 'https://suno.com/',
+    'Origin': 'https://suno.com'
+  };
+
+  // MODE 1: Proxy file audio dengan fallback otomatis
   if (proxy) {
     try {
-      const targetUrl = new URL(proxy);
-      const allowedHosts = ['cdn1.suno.ai', 'cdn2.suno.ai', 'suno.ai', 'suno.com', 'audiopipe.suno.ai'];
-      if (!allowedHosts.some(h => targetUrl.hostname === h || targetUrl.hostname.endsWith('.' + h))) {
-        return res.status(403).json({ error: 'Domain audio tidak diizinkan.' });
+      const candidates = [proxy];
+      const uuidMatch = proxy.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+      const songId = id || (uuidMatch ? uuidMatch[0] : null);
+
+      if (songId) {
+        candidates.push(
+          `https://cdn1.suno.ai/${songId}.mp3`,
+          `https://cdn2.suno.ai/${songId}.mp3`,
+          `https://audiopipe.suno.ai/?item_id=${songId}`
+        );
       }
 
-      const audioRes = await fetch(targetUrl.toString(), {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
+      let audioRes = null;
+      let lastStatus = 500;
 
-      if (!audioRes.ok) {
-        return res.status(audioRes.status).json({ error: 'Gagal mengambil audio dari server Suno.' });
+      for (const candidateUrl of [...new Set(candidates)]) {
+        try {
+          const parsed = new URL(candidateUrl);
+          if (parsed.protocol !== 'https:') continue;
+
+          const attempt = await fetch(candidateUrl, {
+            redirect: 'follow',
+            headers
+          });
+
+          lastStatus = attempt.status;
+          const ct = attempt.headers.get('content-type') || '';
+
+          if (attempt.ok && (ct.includes('audio') || ct.includes('octet-stream') || ct.includes('mp4'))) {
+            audioRes = attempt;
+            break;
+          }
+        } catch (_) {
+          // Lanjut ke URL cadangan berikutnya
+        }
+      }
+
+      if (!audioRes) {
+        return res.status(502).json({
+          error: `Gagal mengambil audio dari server Suno (Status: ${lastStatus}).`
+        });
       }
 
       const contentType = audioRes.headers.get('content-type') || 'audio/mpeg';
@@ -44,9 +79,7 @@ module.exports = async (req, res) => {
   try {
     const pageRes = await fetch(url, {
       redirect: 'follow',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
+      headers
     });
 
     const finalUrl = pageRes.url;
@@ -68,10 +101,15 @@ module.exports = async (req, res) => {
       return match ? match[1] : null;
     };
 
+    // Cari audio_url langsung dari data halaman Suno jika ada
+    const jsonAudioMatch = html.match(/"audio_url"\s*:\s*"(https:[^"]+)"/i)
+      || html.match(/\\?"audio_url\\?"\s*:\s*\\?"(https:[^"\\]+)/i);
+    const extractedAudio = jsonAudioMatch ? jsonAudioMatch[1].replace(/\\u002F/g, '/') : null;
+
     const rawTitle = getMeta('og:title') || 'Lagu Suno';
     const title = rawTitle.replace(/\s*\|\s*Suno\s*$/i, '').trim();
     const image = getMeta('og:image') || `https://cdn2.suno.ai/image_${songId}.jpeg`;
-    const audioUrl = getMeta('og:audio') || `https://cdn1.suno.ai/${songId}.mp3`;
+    const audioUrl = extractedAudio || getMeta('og:audio') || `https://cdn1.suno.ai/${songId}.mp3`;
 
     return res.status(200).json({
       id: songId,
